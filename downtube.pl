@@ -30,7 +30,7 @@ sub html_parser {
 
   my $op_data = shift;
   
-  die "Not a youtube url!\n" 
+  die "Not a Youtube url!\n" 
   unless $op_data->{url} =~ /^(http.?\:\/\/www\.youtube\.\w{2,3}\/)watch\?\w*v=\w*/;
 
   $op_data->{url_root} = $1;
@@ -41,7 +41,7 @@ sub html_parser {
   or die "Couldn't download the page source!\n";
     
   ($op_data->{vid_title}) = $op_data->{page_src} =~ /"title":"(.+?)",/si 
-  or die "Couldn't locate the title JSON Object\n";
+  or die "Couldn't locate the title JSON object\n";
 
   $op_data->{vid_title} =~ s/\\u0026/&/g;
   $op_data->{vid_title} =~ s/[\\\$\/{}:]//g;
