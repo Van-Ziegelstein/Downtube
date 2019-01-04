@@ -50,7 +50,7 @@ sub html_parser {
   or die "Couldn't locate the stream map!\n";
   
   my @stream_map = split(",", $1);
-  print "\nDEBUG ---> Raw stream map:\n$1\n\n" if $op_data->{debug} == 1;
+  print "\nDEBUG ---> Raw stream map:\n$1\n\n" if $op_data->{debug};
   
     
   SELECTION_LOOP: foreach my $value (@stream_map) {
@@ -71,7 +71,7 @@ sub html_parser {
 
               
                print "\nDEBUG ---> Target entry:\n$op_data->{target}\n\n" 
-               if $op_data->{debug} == 1;
+               if $op_data->{debug};
 
 
                if ($op_data->{target} =~ /(&|)s=([[:xdigit:]\.]{20,})(&|)/i) {
@@ -79,7 +79,7 @@ sub html_parser {
                   print "\nVideo uses signature scrambling for copyright protection.\n", 
                         "Attempting forged request...\n";
 
-                  print "\nDEBUG ---> Signature match:\n$2\n" if $op_data->{debug} == 1; 
+                  print "\nDEBUG ---> Signature match:\n$2\n" if $op_data->{debug}; 
            
                   chomp (my $scrambled_signature = signature_scramble($op_data, $2));
                   $op_data->{target} .= "\&signature=" . "$scrambled_signature";
@@ -107,7 +107,7 @@ sub html_parser {
   }
 
   print "\nDEBUG ---> Final target url:\n$op_data->{target}\n" 
-  if $op_data->{debug} == 1; 
+  if $op_data->{debug}; 
  
   print "\nDownloading: $op_data->{vid_title}\n\n";
 
@@ -149,7 +149,7 @@ sub signature_scramble {
   die "Couldn't parse player code\n" unless $script;
 
   print "\nDEBUG ---> Reconstructed javascript code:\n$script\n" 
-  if $op_data->{debug} == 1;      
+  if $op_data->{debug};      
   
   return qx($nodejs -p \Q$script\E);
 
@@ -252,7 +252,7 @@ if ( @ARGV != 0) {
  $op_data{curl} = find_prog("curl");
  html_parser(\%op_data);  
  
- if ($mp3_conv == 1) { mp3_conversion(\%op_data); }  
+ if ($mp3_conv) { mp3_conversion(\%op_data); }  
  
  else { download($op_data{vid_title} . ".mp4", $op_data{curl}, $op_data{target}, $op_data{agent}); }
  
