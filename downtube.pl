@@ -177,7 +177,6 @@ sub download {
 sub mp3_conversion {
 
   my $op_data = shift;
-  my $mp3_title = $op_data->{vid_title} . ".mp3";
   my $ffmpeg = find_prog("ffmpeg");
   
   (my $clip_fhandle, my $clip_fname) = tempfile("clipXXXXX", UNLINK => 1);
@@ -189,7 +188,7 @@ sub mp3_conversion {
   
      print "\nConverting video to mp3 file...\n";
   
-     system("$ffmpeg", "-loglevel", "quiet", "-i", "$clip_fname", "-qscale:a", "0", "$mp3_title" );
+     system("$ffmpeg", "-loglevel", "quiet", "-i", "$clip_fname", "-qscale:a", "0", $op_data->{vid_title} . ".mp3");
   
      warn "Error: MP3 conversion attempt completed with errors!\n" if $? != 0;
 
