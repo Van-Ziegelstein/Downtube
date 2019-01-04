@@ -5,6 +5,27 @@ use warnings;
 use File::Temp qw/ tempfile /;
 
 
+sub find_prog {
+
+  my $prog_name = shift;
+  my $exe;
+
+  foreach my $dir (split(":", $ENV{PATH})) {
+
+	if (-e "$dir/$prog_name" && -x _) {
+	   
+	   $exe = "$dir/$prog_name";
+	   last;
+
+	}
+  }
+
+  die "Couldn't locate $prog_name in your path.\n" unless $exe;
+  return $exe;
+
+}
+
+
 sub html_parser {
 
   my $op_data = shift;
@@ -16,7 +37,7 @@ sub html_parser {
 
   
   PARSING_START:
-  $op_data->{page_src} = qx(curl -sSL --compressed -A \Q$op_data->{agent}\E \Q$op_data->{url}\E)
+  $op_data->{page_src} = qx($op_data->{curl} -sSL --compressed -A \Q$op_data->{agent}\E \Q$op_data->{url}\E)
   or die "Couldn't download the page source!\n";
     
   ($op_data->{vid_title}) = $op_data->{page_src} =~ /"title":"(.+?)",/si 
@@ -99,12 +120,13 @@ sub signature_scramble {
   my @helper_objects;
   my $op_data = shift;
   my %player_resources = (crypt_signature => shift);
+  my $nodejs = find_prog("node");
 
   
   $player_resources{player_url} = $op_data->{url_root} . $1 if $op_data->{page_src} =~ /src="\/(.+\/jsbin[^"]*\/base\.js)/;
   die "Couldn't extract the player url!\n" unless $player_resources{player_url};
 
-  $player_resources{player_js} = qx(curl -sSL --compressed -A \Q$op_data->{agent}\E $player_resources{player_url}) 
+  $player_resources{player_js} = qx($op_data->{curl} -sSL --compressed -A \Q$op_data->{agent}\E $player_resources{player_url}) 
   or die "Couldn't download the player script!\n";
 
   
@@ -129,16 +151,16 @@ sub signature_scramble {
   print "\nDEBUG ---> Reconstructed javascript code:\n$script\n" 
   if $op_data->{debug} == 1;      
   
-  return qx(node -p \Q$script\E);
+  return qx($nodejs -p \Q$script\E);
 
 }
 
 
 sub download {
 
-  my ($file_name, $src_url, $agent_cloak) = @_;
+  my ($file_name, $curl, $src_url, $agent_cloak) = @_;
   
-  system("curl", "-L", "-C", "-", "-S", "--retry", "4", "-A", "$agent_cloak", "-o", "$file_name", "$src_url"); 
+  system("$curl", "-L", "-C", "-", "-S", "--retry", "4", "-A", "$agent_cloak", "-o", "$file_name", "$src_url"); 
 
   if ($? != 0) {
       
@@ -156,17 +178,18 @@ sub mp3_conversion {
 
   my $op_data = shift;
   my $mp3_title = $op_data->{vid_title} . ".mp3";
+  my $ffmpeg = find_prog("ffmpeg");
   
   (my $clip_fhandle, my $clip_fname) = tempfile("clipXXXXX", UNLINK => 1);
 
-  my $status = download($clip_fname, $op_data->{target}, $op_data->{agent});
+  my $status = download($clip_fname, $op_data->{curl}, $op_data->{target}, $op_data->{agent});
   die "Aborting mp3 conversion...\n" if $status == -1; 
   
   if (-s $clip_fhandle) { 
   
      print "\nConverting video to mp3 file...\n";
   
-     system("ffmpeg", "-loglevel", "quiet", "-i", "$clip_fname", "-qscale:a", "0", "$mp3_title" );
+     system("$ffmpeg", "-loglevel", "quiet", "-i", "$clip_fname", "-qscale:a", "0", "$mp3_title" );
   
      warn "Error: MP3 conversion attempt completed with errors!\n" if $? != 0;
 
@@ -227,15 +250,12 @@ if ( @ARGV != 0) {
  die "You must provide a youtube url!\n" unless defined $op_data{url};     
 
  
+ $op_data{curl} = find_prog("curl");
  html_parser(\%op_data);  
  
  if ($mp3_conv == 1) { mp3_conversion(\%op_data); }  
  
- else { 
-
-       $op_data{vid_title} .= ".mp4";
-       download($op_data{vid_title}, $op_data{target}, $op_data{agent}); 
- }
+ else { download($op_data{vid_title} . ".mp4", $op_data{curl}, $op_data{target}, $op_data{agent}); }
  
 }
 else { help_dialogue; }
