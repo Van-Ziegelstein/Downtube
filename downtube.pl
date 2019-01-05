@@ -218,6 +218,7 @@ if ( @ARGV != 0) {
  my %op_data = (
 
        url => undef,
+       curl => find_prog("curl"),
        agent => "Mozilla/5.0 (Windows NT 6.1; rv:60.0) Gecko/20100101 Firefox/60.0",
        debug => 0,
        formats => [
@@ -251,8 +252,6 @@ if ( @ARGV != 0) {
  
  die "You must provide a youtube url!\n" unless defined $op_data{url};     
 
- 
- $op_data{curl} = find_prog("curl");
  html_parser(\%op_data);  
  
  if ($mp3_conv) { mp3_conversion(\%op_data); }  
