@@ -207,7 +207,7 @@ sub help_dialogue {
  print "\nRudimentary Perl script to download Youtube videos from the commandline.\n",
        "Can automatically convert them to mp3 files with ffmpeg.\n",
        "Videos with scrambled signatures can also be downloaded, provided nodejs is installed.\n\n",
-       "Usage: $0 --help | -u <video_url> [-mp3] [-debug]\n\n";
+       "Usage: $0 -help | -u <video_url> [-mp3] [-debug]\n\n";
 
 }
 
@@ -236,7 +236,7 @@ if ( @ARGV != 0) {
 
  until (@ARGV == 0) {
     
-    if ($ARGV[0] =~ /--help/i) { help_dialogue; exit 0; }
+    if ($ARGV[0] =~ /-*help/i) { help_dialogue; exit 0; }
   
     elsif ($ARGV[0] =~ /-u/) { shift; chomp($op_data{url} = $ARGV[0]); }
 
@@ -244,7 +244,7 @@ if ( @ARGV != 0) {
   
     elsif ($ARGV[0] =~ /-debug/i) { $op_data{debug} = 1; }
  
-    else { die "That option is unsupported. Type --help for more info...\n";}
+    else { die "That option is unsupported. Type -help for more info...\n";}
   
     shift;
   
