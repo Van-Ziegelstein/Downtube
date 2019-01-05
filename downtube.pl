@@ -130,10 +130,12 @@ sub signature_scramble {
   or die "Couldn't download the player script!\n";
 
   
+  #Locate the scrambling routine.
   ($player_resources{crypt_func}) = $player_resources{player_js} =~ /((\w+?)\s*=\s*function\((.*?)\)\s*\{\s*\g3\s*=\s*\g3\.split\(\"\"\).*?\};)/;  
   $player_resources{crypt_func_call} = $2 . "(\"" . "$player_resources{crypt_signature}" . "\");"; 
 
 
+  #Locate auxilary variables and functions used by the scrambling routine.
   OBJ_CHECK: while ($player_resources{crypt_func} =~ /;([^\s]+?)\./g) {
    
      foreach my $entry (@helper_objects) { next OBJ_CHECK if $entry =~ /^var\s\Q$1\E/; }
@@ -143,6 +145,7 @@ sub signature_scramble {
   }
    
    
+  #Piece everything together.
   foreach my $entry (@helper_objects) { $script .= "$entry\n"; }     
   $script .= "$player_resources{crypt_func}\n" . "$player_resources{crypt_func_call}\n";  
    
