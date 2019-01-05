@@ -244,13 +244,13 @@ if ( @ARGV != 0) {
   
     elsif ($ARGV[0] =~ /-debug/i) { $op_data{debug} = 1; }
  
-    else { die "That option is unsupported. Type -help for more info...\n";}
+    else { die "Unsupported option. Type -help for more info...\n";}
   
     shift;
   
  }        
  
- die "You must provide a youtube url!\n" unless defined $op_data{url};     
+ die "You must provide a Youtube url!\n" unless defined $op_data{url};     
 
  html_parser(\%op_data);  
  
