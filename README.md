@@ -9,6 +9,8 @@ Simple Youtube downloader
 
 [Usage](#usage)
 
+[Screenshots](#screenshots)
+
 [Limitations](#limitations)
 
 ## Description
@@ -60,6 +62,12 @@ Invoking *Downtube* should be straightforward:
 `-debug`: This option is primarily intended for development purposes and will make the script output **a lot** more info. 
 
 `-help`: Print some helpful stuff to the console.
+
+## Screenshots 
+
+| Downloading a normal youtube video | Downloading a protected video and converting to mp3 |
+| ---------------------------------- | --------------------------------------------------- |
+| <img src="screenshots/down1.png">  | <img src="screenshots/down2.png">                   |
 
 ## Limitations
 * This is a tool for downloading Youtube videos and **only** Youtube videos. Other sites like Dailymotion, [insert name]-Tube etc.
