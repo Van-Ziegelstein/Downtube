@@ -46,6 +46,10 @@ pseudo-protection scheme. In order to download such videos, the script needs to 
 Strictly speaking, *Downtube* doesn't require the nodejs framework in its entirety. 
 Any Javascript interpreter will do, in fact. The same holds true for the ffmpeg dependency. So, again, feel free to customize.
 
+## Installation
+Download the latest version from the [Release](https://github.com/Van-Ziegelstein/Downtube/releases) page and you
+should be ready to go.
+
 ## Usage
 Invoking *Downtube* should be straightforward:
 
