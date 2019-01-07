@@ -77,4 +77,5 @@ likely won't change). If you absolutely require such functionality, then I sugge
 ## Authors
 **Van Ziegelstein** - Creator and Maintainer
 
-
+## License
+This project is licensed under the [MIT License](LICENSE).
