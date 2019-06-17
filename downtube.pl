@@ -74,7 +74,7 @@ sub html_parser {
                if $op_data->{debug};
 
 
-               if ($op_data->{target} =~ /^(.+&|)s=(.+)(&|)/i) {
+               if ($op_data->{target} =~ /^(.+&|)s=([^&]+)/i) {
 
                   print "\nVideo uses signature scrambling for copyright protection.\n", 
                         "Attempting forged request...\n";
