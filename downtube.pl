@@ -74,7 +74,7 @@ sub html_parser {
                if $op_data->{debug};
 
 
-               if ($op_data->{target} =~ /(&|)s=([[:xdigit:]\.]{20,})(&|)/i) {
+               if ($op_data->{target} =~ /^(.+&|)s=(.+)(&|)/i) {
 
                   print "\nVideo uses signature scrambling for copyright protection.\n", 
                         "Attempting forged request...\n";
@@ -82,7 +82,7 @@ sub html_parser {
                   print "\nDEBUG ---> Signature match:\n$2\n" if $op_data->{debug}; 
            
                   chomp (my $scrambled_signature = signature_scramble($op_data, $2));
-                  $op_data->{target} .= "\&signature=" . "$scrambled_signature";
+                  $op_data->{target} .= "\&sig=" . "$scrambled_signature";
 
                }
                       
@@ -100,7 +100,7 @@ sub html_parser {
   die "The video doesn't seem to be available in one of the standard mp4 formats!\n" 
   unless defined $op_data->{target}; 
 
-  unless ($op_data->{target} =~ /\&signature=/) {
+  unless ($op_data->{target} =~ /\&sig=/) {
    
         print "Target url did not parse correctly, reattempting...\n";
         goto PARSING_START;
