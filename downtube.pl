@@ -2,6 +2,7 @@
 
 use strict;
 use warnings;
+use JSON::PP;
 use File::Temp qw/ tempfile /;
 
 
@@ -26,90 +27,121 @@ sub find_prog {
 }
 
 
+sub url_decode {
+    
+    my $url = shift;
+
+    $url =~ s/%([[:xdigit:]]{2})/chr(hex($1))/ieg;
+    $url =~ s/\\u0026/&/g;
+
+    return $url
+}
+
+
+sub get_streams {
+
+    my ($format_list) = shift =~ /adaptiveFormats\\":(\[.*?\])/;
+    my $debug = shift;
+    
+    die "Couldn't locate the adaptive streams.\n" unless $format_list;
+
+    # need to reduce the nesting of the backslash escapes
+    $format_list =~ s/\\([^\\]{1})/$1/g;
+    $format_list =~ s/\Q\\\E/\\/g;
+
+    print "\nDEBUG ---> Parsed stream map:\n$format_list\n\n" if $debug;
+    
+    return decode_json($format_list)
+}
+
+
+sub select_stream {
+    
+    my $streams = shift;
+    my $count = 0;
+    my $selection = -1;
+
+
+    foreach my $stream (@{$streams}) {
+
+        $count++;
+        print "\nStream $count:\n";
+
+        foreach my $key (keys %{ $stream }) {
+            print "$key: $stream->{$key}\n";
+        }
+
+        print "\n\n";
+    }
+
+
+    do {
+        
+        print "Select one of the available streams (1 - $count): ";
+        chomp($selection = <STDIN>);
+
+    } while ($selection < 1 || $selection > @{ $streams }); 
+
+
+    return $streams->[$selection - 1];
+
+}
+
 sub html_parser {
 
-  my $op_data = shift;
+    my $op_data = shift;
+
+    die "Not a Youtube url!\n" 
+    unless $op_data->{url} =~ /^(http.?\:\/\/www\.youtube\.\w{2,3}\/)watch\?\w*v=\w*/;
+
+    $op_data->{url_root} = $1;
+
+    $op_data->{page_src} = qx($op_data->{curl} -sSL --compressed -A \Q$op_data->{agent}\E \Q$op_data->{url}\E)
+    or die "Couldn't download the page source!\n";
+
+    ($op_data->{vid_title}) = $op_data->{page_src} =~ /"title":"(.+?)",/si 
+    or die "Couldn't locate the title JSON object\n";
+
+    $op_data->{vid_title} =~ s/\\u0026/&/g;
+    $op_data->{vid_title} =~ s/[\\\$\/{}:]//g;
+
+    my $target_stream = select_stream(get_streams($op_data->{page_src}, $op_data->{debug}));
+
+
+    if ($target_stream->{cipher} && $target_stream->{cipher} =~ /url=(.*)/) {
+
+        print "\nVideo uses signature scrambling for copyright protection.\n", 
+        "Attempting forged request...\n";
+
+        $op_data->{target} = url_decode($1);
+        print "\nDEBUG ---> Target entry:\n$op_data->{target}\n\n" 
+        if $op_data->{debug};
+
+        $op_data->{target} =~ /^(.+&|)s=([^&]+)/i
+        or die "Couldn't extract the signature challenge from the url.";
+
+        my $challenge = $2;
+
+        $op_data->{target} =~ /^(.+&|)sp=([^&]+)/i
+        or die "Couldn't extract the signature parameter name from the url.";
+
+        my $sig_param = $2;
+
+        print "\nDEBUG ---> Signature match:\n$challenge\n", 
+        "\nDEBUG ---> Signature url parameter: $sig_param\n" 
+        if $op_data->{debug}; 
+
+        chomp (my $scrambled_signature = signature_scramble($op_data, $challenge));
+        $op_data->{target} .= "\&$sig_param=" . "$scrambled_signature";
+
+    }
+    else { $op_data->{target} = url_decode($target_stream->{url}); }
   
-  die "Not a Youtube url!\n" 
-  unless $op_data->{url} =~ /^(http.?\:\/\/www\.youtube\.\w{2,3}\/)watch\?\w*v=\w*/;
 
-  $op_data->{url_root} = $1;
+    print "\nDEBUG ---> Final target url:\n$op_data->{target}\n" 
+    if $op_data->{debug}; 
 
-  
-  PARSING_START:
-  $op_data->{page_src} = qx($op_data->{curl} -sSL --compressed -A \Q$op_data->{agent}\E \Q$op_data->{url}\E)
-  or die "Couldn't download the page source!\n";
-    
-  ($op_data->{vid_title}) = $op_data->{page_src} =~ /"title":"(.+?)",/si 
-  or die "Couldn't locate the title JSON object\n";
-
-  $op_data->{vid_title} =~ s/\\u0026/&/g;
-  $op_data->{vid_title} =~ s/[\\\$\/{}:]//g;
-
-  $op_data->{page_src} =~ /url_encoded_fmt_stream_map":\s?"(.*?)"/i 
-  or die "Couldn't locate the stream map!\n";
-  
-  my @stream_map = split(",", $1);
-  print "\nDEBUG ---> Raw stream map:\n$1\n\n" if $op_data->{debug};
-  
-    
-  SELECTION_LOOP: foreach my $value (@stream_map) {
-  
-    if ($value =~ /mp4/) {
-     
-        foreach my $quality (@{$op_data->{formats}}) {
-        
-            if ($value =~ /$quality/) {
-           
-               $op_data->{target} = $value;
-               $op_data->{target} =~ s/%([[:xdigit:]]{2})/chr(hex($1))/ieg;
-               $op_data->{target} =~ s/\\u0026/&/g;
-       
-              
-               my $counter = () = $op_data->{target} =~ /itag=\d{2,3}/g;
-               $op_data->{target} =~ s/itag=\d{2,3}// if $counter > 1;
-
-              
-               print "\nDEBUG ---> Target entry:\n$op_data->{target}\n\n" 
-               if $op_data->{debug};
-
-
-               if ($op_data->{target} =~ /^(.+&|)s=([^&]+)/i) {
-
-                  print "\nVideo uses signature scrambling for copyright protection.\n", 
-                        "Attempting forged request...\n";
-
-                  print "\nDEBUG ---> Signature match:\n$2\n" if $op_data->{debug}; 
-           
-                  chomp (my $scrambled_signature = signature_scramble($op_data, $2));
-                  $op_data->{target} .= "\&sig=" . "$scrambled_signature";
-
-               }
-                      
-               $op_data->{target} =~ s/^.*url=|"//g;
-               last SELECTION_LOOP;
-              
-            }
-            
-        }
-        
-     }
-  
-  }
- 
-  die "The video doesn't seem to be available in one of the standard mp4 formats!\n" 
-  unless defined $op_data->{target}; 
-
-  unless ($op_data->{target} =~ /\&sig=/) {
-   
-        print "Target url did not parse correctly, reattempting...\n";
-        goto PARSING_START;
-  }
-
-  print "\nDEBUG ---> Final target url:\n$op_data->{target}\n" 
-  if $op_data->{debug}; 
- 
-  print "\nDownloading: $op_data->{vid_title}\n\n";
+    print "\nDownloading: $op_data->{vid_title}\n\n";
 
 }
 
@@ -221,16 +253,6 @@ if ( @ARGV != 0) {
        curl => find_prog("curl"),
        agent => "Mozilla/5.0 (Windows NT 6.1; rv:60.0) Gecko/20100101 Firefox/60.0",
        debug => 0,
-       formats => [
-
-                   "itag=37",  # Full High Quality, 1080p, MP4
-                   "itag=22",  # High Quality, 720p, MP4
-                   "itag=135", # Standard Quality, 480p, MP4
-                   "itag=18",  # Medium Quality, 360p, MP4
-                   "itag=133", # Low Quality, 240p, MP4
-                   "itag=160"  # Low Quality, 144p, MP4
-
-                  ]
 
  );
 
