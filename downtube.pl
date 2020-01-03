@@ -40,7 +40,7 @@ sub url_decode {
 
 sub pick_stream {
 
-    my $stream_list = shift;
+    my ($stream_list, $debug) = @_;
     my $count = 0;
     my $selection = 0;
 
@@ -51,6 +51,11 @@ sub pick_stream {
         print "\nStream $count:\n";
 
         foreach my $key (keys %{ $stream }) {
+            
+            if (!$debug && $key !~ /(itag|bitrate|qualityLabel|quality|averageBitrate|height|width|fps)/) {
+                next;
+            }
+
             print "$key: $stream->{$key}\n";
         }
 
@@ -96,13 +101,13 @@ sub get_mp4streams {
     }
     
 
-    print "Choose one of the available mp4 audio streams:\n\n";
-    push(@target_streams, pick_stream($mp4_streams{audio}));
+    print "\nChoose one of the available mp4 audio streams:\n\n";
+    push(@target_streams, pick_stream($mp4_streams{audio}, $debug));
 
     unless ($audio_only) {
 
-        print "Choose one of the available mp4 video streams:\n\n";
-        push(@target_streams, pick_stream($mp4_streams{video}));
+        print "\nChoose one of the available mp4 video streams:\n\n";
+        push(@target_streams, pick_stream($mp4_streams{video}, $debug));
     }
 
     return @target_streams;
@@ -180,7 +185,7 @@ sub video_metadigger {
 
         my $true_url;
         my ($type) = $stream->{mimeType} =~ /(audio|video)/;
-        print "\nChecking source url of $type stream.\n";
+        print "\nChecking source url of $type stream...\n";
 
         if ($stream->{cipher}) {
 
