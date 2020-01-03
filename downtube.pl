@@ -68,7 +68,7 @@ sub pick_stream {
         print "Your pick (1 - $count): ";
         chomp($selection = <STDIN>);
 
-    } while ($selection < 1 || $selection > @{ $stream_list }); 
+    } while (!$selection || $selection < 1 || $selection > @{ $stream_list }); 
 
 
     return $stream_list->[$selection - 1];
