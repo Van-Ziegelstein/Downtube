@@ -43,6 +43,7 @@ sub pick_stream {
     my ($stream_list, $debug) = @_;
     my $count = 0;
     my $selection = 0;
+    my $category_filter = 'itag|bitrate|qualityLabel|quality|audioQuality|audioChannels|audioSampleRate|averageBitrate|height|width|fps';
 
 
     foreach my $stream (@{ $stream_list }) {
@@ -52,7 +53,7 @@ sub pick_stream {
 
         foreach my $key (keys %{ $stream }) {
             
-            if (!$debug && $key !~ /(itag|bitrate|qualityLabel|quality|averageBitrate|height|width|fps)/) {
+            if (!$debug && $key !~ /$category_filter/) {
                 next;
             }
 
