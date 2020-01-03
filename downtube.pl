@@ -42,6 +42,7 @@ sub get_streams {
 
     my ($format_list) = shift =~ /adaptiveFormats\\":(\[.*?\])/;
     my $debug = shift;
+    my (@video_streams, @audio_streams);
     
     die "Couldn't locate the adaptive streams.\n" unless $format_list;
 
@@ -50,19 +51,31 @@ sub get_streams {
     $format_list =~ s/\Q\\\E/\\/g;
 
     print "\nDEBUG ---> Parsed stream map:\n$format_list\n\n" if $debug;
+
+    my $streams = decode_json($format_list);
+
+    foreach my $stream (@{ $streams }) {
+        
+        if ($stream->{mimeType} =~ /(video|audio)\/mp4/) {
+
+            push(@video_streams, $stream) if $1 eq "video";
+            push(@audio_streams, $stream) if $1 eq "audio"; 
+        }
+
+    }
     
-    return decode_json($format_list)
+    return \@video_streams, \@audio_streams;
 }
 
 
-sub select_stream {
-    
-    my $streams = shift;
+sub pick_stream {
+
+    my $stream_list = shift;
     my $count = 0;
-    my $selection = -1;
+    my $selection = 0;
 
 
-    foreach my $stream (@{$streams}) {
+    foreach my $stream (@{ $stream_list }) {
 
         $count++;
         print "\nStream $count:\n";
@@ -77,72 +90,32 @@ sub select_stream {
 
     do {
         
-        print "Select one of the available streams (1 - $count): ";
+        print "Your pick (1 - $count): ";
         chomp($selection = <STDIN>);
 
-    } while ($selection < 1 || $selection > @{ $streams }); 
+    } while ($selection < 1 || $selection > @{ $stream_list }); 
 
 
-    return $streams->[$selection - 1];
-
+    return $stream_list->[$selection - 1];
 }
 
-sub html_parser {
 
-    my $op_data = shift;
-
-    die "Not a Youtube url!\n" 
-    unless $op_data->{url} =~ /^(http.?\:\/\/www\.youtube\.\w{2,3}\/)watch\?\w*v=\w*/;
-
-    $op_data->{url_root} = $1;
-
-    $op_data->{page_src} = qx($op_data->{curl} -sSL --compressed -A \Q$op_data->{agent}\E \Q$op_data->{url}\E)
-    or die "Couldn't download the page source!\n";
-
-    ($op_data->{vid_title}) = $op_data->{page_src} =~ /"title":"(.+?)",/si 
-    or die "Couldn't locate the title JSON object\n";
-
-    $op_data->{vid_title} =~ s/\\u0026/&/g;
-    $op_data->{vid_title} =~ s/[\\\$\/{}:]//g;
-
-    my $target_stream = select_stream(get_streams($op_data->{page_src}, $op_data->{debug}));
+sub choose_streams {
+    
+    my ($video_streams, $audio_streams, $audio_only) = @_;
+    my @target_streams;
 
 
-    if ($target_stream->{cipher} && $target_stream->{cipher} =~ /url=(.*)/) {
+    print "Choose one of the available mp4 audio streams:\n\n";
+    push(@target_streams, pick_stream($audio_streams));
 
-        print "\nVideo uses signature scrambling for copyright protection.\n", 
-        "Attempting forged request...\n";
+    unless ($audio_only) {
 
-        $op_data->{target} = url_decode($1);
-        print "\nDEBUG ---> Target entry:\n$op_data->{target}\n\n" 
-        if $op_data->{debug};
-
-        $op_data->{target} =~ /^(.+&|)s=([^&]+)/i
-        or die "Couldn't extract the signature challenge from the url.";
-
-        my $challenge = $2;
-
-        $op_data->{target} =~ /^(.+&|)sp=([^&]+)/i
-        or die "Couldn't extract the signature parameter name from the url.";
-
-        my $sig_param = $2;
-
-        print "\nDEBUG ---> Signature match:\n$challenge\n", 
-        "\nDEBUG ---> Signature url parameter: $sig_param\n" 
-        if $op_data->{debug}; 
-
-        chomp (my $scrambled_signature = signature_scramble($op_data, $challenge));
-        $op_data->{target} .= "\&$sig_param=" . "$scrambled_signature";
-
+        print "Choose one of the available mp4 video streams:\n\n";
+        push(@target_streams, pick_stream($video_streams));
     }
-    else { $op_data->{target} = url_decode($target_stream->{url}); }
-  
 
-    print "\nDEBUG ---> Final target url:\n$op_data->{target}\n" 
-    if $op_data->{debug}; 
-
-    print "\nDownloading: $op_data->{vid_title}\n\n";
-
+    return @target_streams;
 }
 
 
@@ -191,6 +164,74 @@ sub signature_scramble {
 }
 
 
+sub video_metadigger {
+
+    my $op_data = shift;
+
+    die "Not a Youtube url!\n" 
+    unless $op_data->{url} =~ /^(http.?\:\/\/www\.youtube\.\w{2,3}\/)watch\?\w*v=\w*/;
+
+    $op_data->{url_root} = $1;
+
+    $op_data->{page_src} = qx($op_data->{curl} -sSL --compressed -A \Q$op_data->{agent}\E \Q$op_data->{url}\E)
+    or die "Couldn't download the page source!\n";
+
+    ($op_data->{vid_title}) = $op_data->{page_src} =~ /"title":"(.+?)",/si 
+    or die "Couldn't locate the title JSON object\n";
+
+    $op_data->{vid_title} =~ s/\\u0026/&/g;
+    $op_data->{vid_title} =~ s/[\\\$\/{}:]//g;
+
+    my @target_streams = choose_streams(get_streams($op_data->{page_src}, $op_data->{debug}), $op_data->{audio_only});
+
+
+    foreach my $stream (@target_streams) {
+
+
+        my $true_url;
+        my ($type) = $stream->{mimeType} =~ /(audio|video)/;
+        print "\nChecking source url of $type stream.\n";
+
+        if ($stream->{cipher}) {
+
+            print "\nStream uses signature scrambling for copyright protection.\n", 
+            "Forging token...\n";
+
+            my $url_soup = url_decode($stream->{cipher});
+            ($true_url) = $url_soup =~ /url=(.*)/;
+            print "\nDEBUG ---> Decoded target url string:\n$url_soup\n\n" 
+            if $op_data->{debug};
+
+            $url_soup =~ /^(.+&|)s=([^&]+)/i
+            or die "Couldn't extract the signature challenge from the url.";
+
+            my $challenge = $2;
+
+            $url_soup =~ /^(.+&|)sp=([^&]+)/i
+            or die "Couldn't extract the signature parameter name from the url.";
+
+            my $sig_param = $2;
+
+            print "\nDEBUG ---> Signature match:\n$challenge\n", 
+            "\nDEBUG ---> Signature url parameter: $sig_param\n" 
+            if $op_data->{debug}; 
+
+            chomp (my $scrambled_signature = signature_scramble($op_data, $challenge));
+            $true_url .= "\&$sig_param=" . "$scrambled_signature";
+
+        }
+        else { $true_url = url_decode($stream->{url}); }
+
+        print "\nDEBUG ---> Final target url:\n$true_url\n" 
+        if $op_data->{debug}; 
+
+        $op_data->{$type . "_target"} = { src => $true_url }; 
+
+    }
+
+}
+
+
 sub download {
 
     my ($file_name, $curl, $src_url, $agent_cloak) = @_;
@@ -209,28 +250,49 @@ sub download {
 }
 
 
-sub mp3_conversion {
+sub assemble {
 
     my $op_data = shift;
     my $ffmpeg = find_prog("ffmpeg");
 
-    (my $clip_fhandle, my $clip_fname) = tempfile("clipXXXXX", UNLINK => 1);
+    print "\nDownloading all streams...\n\n";
 
-    my $status = download($clip_fname, $op_data->{curl}, $op_data->{target}, $op_data->{agent});
-    die "Aborting mp3 conversion...\n" if $status == -1; 
+    foreach my $target ($op_data->{audio_target}, $op_data->{video_target}) {
 
-    if (-s $clip_fhandle) { 
+        next unless $target;
 
-        print "\nConverting video to mp3 file...\n";
+        ($target->{fhandle}, $target->{fname}) = tempfile("clipXXXXX", UNLINK => 1);
 
-        system("$ffmpeg", "-loglevel", "quiet", "-i", "$clip_fname", "-qscale:a", "0", $op_data->{vid_title} . ".mp3");
-
-        warn "Error: MP3 conversion attempt completed with errors!\n" if $? != 0;
+        my $status = download($target->{fname}, $op_data->{curl}, $target->{src}, $op_data->{agent});
+        die "Aborting download...\n" if $status == -1; 
 
     }
 
-    close($clip_fhandle);
-  
+    
+    if ($op_data->{audio_only}) {
+
+        print "\nConverting audio data to mp3 file...\n";
+
+        system($ffmpeg, "-loglevel", "quiet", "-i", 
+        $op_data->{audio_target}->{fname}, "-qscale:a", "0", $op_data->{vid_title} . ".mp3");
+
+        warn "Error: something went wrong during mp3 conversion.\n" if $? != 0;
+        
+    }
+    else {
+        
+        print "Combining audio and video streams...\n";
+
+        system($ffmpeg, "-loglevel", "quiet", "-i", $op_data->{video_target}->{fname}, 
+        "-i", $op_data->{audio_target}->{fname}, "-c", "copy", $op_data->{vid_title} . ".mp4");
+
+        warn "Error: something went wrong during the final assembly.\n" if $? != 0;
+    }
+
+    foreach my $target ($op_data->{audio_target}, $op_data->{video_target}) {
+        close($target->{fhandle}) if $target;
+    }
+
 }
 
 
@@ -246,13 +308,15 @@ sub help_dialogue {
 
 if ( @ARGV != 0) {
 
-    my $mp3_conv = 0;
     my %op_data = (
 
             url => undef,
             curl => find_prog("curl"),
             agent => "Mozilla/5.0 (Windows NT 6.1; rv:60.0) Gecko/20100101 Firefox/60.0",
-            debug => 0,
+            audio_only => 0,
+            audio_target => undef,
+            video_target => undef,
+            debug => 0
 
     );
 
@@ -262,7 +326,7 @@ if ( @ARGV != 0) {
 
         elsif ($ARGV[0] =~ /-u/) { shift; chomp($op_data{url} = $ARGV[0]); }
 
-        elsif ($ARGV[0] =~ /-mp3/i) { $mp3_conv = 1; }
+        elsif ($ARGV[0] =~ /-mp3/i) { $op_data{audio_only} = 1; }
 
         elsif ($ARGV[0] =~ /-debug/i) { $op_data{debug} = 1; }
 
@@ -274,11 +338,8 @@ if ( @ARGV != 0) {
 
     die "You must provide a Youtube url!\n" unless defined $op_data{url};     
 
-    html_parser(\%op_data);  
-
-    if ($mp3_conv) { mp3_conversion(\%op_data); }  
-
-    else { download($op_data{vid_title} . ".mp4", $op_data{curl}, $op_data{target}, $op_data{agent}); }
+    video_metadigger(\%op_data);  
+    assemble(\%op_data);
  
 }
 else { help_dialogue; }
