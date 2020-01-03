@@ -38,36 +38,6 @@ sub url_decode {
 }
 
 
-sub get_streams {
-
-    my ($format_list) = shift =~ /adaptiveFormats\\":(\[.*?\])/;
-    my $debug = shift;
-    my (@video_streams, @audio_streams);
-    
-    die "Couldn't locate the adaptive streams.\n" unless $format_list;
-
-    # need to reduce the nesting of the backslash escapes
-    $format_list =~ s/\\([^\\]{1})/$1/g;
-    $format_list =~ s/\Q\\\E/\\/g;
-
-    print "\nDEBUG ---> Parsed stream map:\n$format_list\n\n" if $debug;
-
-    my $streams = decode_json($format_list);
-
-    foreach my $stream (@{ $streams }) {
-        
-        if ($stream->{mimeType} =~ /(video|audio)\/mp4/) {
-
-            push(@video_streams, $stream) if $1 eq "video";
-            push(@audio_streams, $stream) if $1 eq "audio"; 
-        }
-
-    }
-    
-    return \@video_streams, \@audio_streams;
-}
-
-
 sub pick_stream {
 
     my $stream_list = shift;
@@ -100,19 +70,39 @@ sub pick_stream {
 }
 
 
-sub choose_streams {
-    
-    my ($video_streams, $audio_streams, $audio_only) = @_;
-    my @target_streams;
+sub get_mp4streams {
 
+    my ($format_list) = shift =~ /adaptiveFormats\\":(\[.*?\])/;
+    my ($debug, $audio_only) = @_;
+    my %mp4_streams = (video => [], audio => []);
+    my @target_streams;
+    
+    die "Couldn't locate the adaptive streams.\n" unless $format_list;
+
+    # need to reduce the nesting of the backslash escapes
+    $format_list =~ s/\\([^\\]{1})/$1/g;
+    $format_list =~ s/\Q\\\E/\\/g;
+
+    print "\nDEBUG ---> Parsed stream map:\n$format_list\n\n" if $debug;
+
+    my $all_streams = decode_json($format_list);
+
+    foreach my $stream (@{ $all_streams }) {
+        
+        if ($stream->{mimeType} =~ /(video|audio)\/mp4/) {
+            push(@{ $mp4_streams{$1} }, $stream);
+        }
+
+    }
+    
 
     print "Choose one of the available mp4 audio streams:\n\n";
-    push(@target_streams, pick_stream($audio_streams));
+    push(@target_streams, pick_stream($mp4_streams{audio}));
 
     unless ($audio_only) {
 
         print "Choose one of the available mp4 video streams:\n\n";
-        push(@target_streams, pick_stream($video_streams));
+        push(@target_streams, pick_stream($mp4_streams{video}));
     }
 
     return @target_streams;
@@ -182,7 +172,7 @@ sub video_metadigger {
     $op_data->{vid_title} =~ s/\\u0026/&/g;
     $op_data->{vid_title} =~ s/[\\\$\/{}:]//g;
 
-    my @target_streams = choose_streams(get_streams($op_data->{page_src}, $op_data->{debug}), $op_data->{audio_only});
+    my @target_streams = get_mp4streams($op_data->{page_src}, $op_data->{debug}, $op_data->{audio_only});
 
 
     foreach my $stream (@target_streams) {
