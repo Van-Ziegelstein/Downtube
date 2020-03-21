@@ -38,41 +38,105 @@ sub url_decode {
 }
 
 
+sub bitrate_heap_add {
+
+    my ($stream_list, $stream) = @_;
+
+    # Bubble up insertion algorithm.
+    # The shifting is to avoid the automatic float
+    # precision of the regular division operator.
+    push(@{ $stream_list }, $stream);
+    my $child = @{$stream_list} - 1;
+    my $parent = $child >> 1;
+
+    while ($child != 0) {
+
+        ($stream_list->[$parent], $stream_list->[$child]) = ($stream_list->[$child], $stream_list->[$parent])
+        if $stream_list->[$parent]->{bitrate} > $stream_list->[$child]->{bitrate};
+
+        ($child, $parent) = ($parent, ($parent - 1) >> 1);
+    }
+
+}
+
+
+sub bitrate_heap_bubbledown {
+
+    my ($stream_list, $root) = @_;
+    my $leftC =  $root * 2 + 1;
+    my $rightC = $root * 2 + 2;
+    my $best = $root;
+
+
+    $best = $leftC if $leftC < @{ $stream_list } && $stream_list->[$leftC]->{bitrate} < $stream_list->[$best]->{bitrate};
+
+    $best = $rightC if $rightC < @{ $stream_list } && $stream_list->[$rightC]->{bitrate} < $stream_list->[$best]->{bitrate};
+
+    if ($best != $root) {
+
+        ($stream_list->[$root], $stream_list->[$best]) = ($stream_list->[$best], $stream_list->[$root]);
+        bitrate_heap_bubbledown($stream_list, $best)
+    }
+}
+
+
+sub bitrate_heap_behead {
+
+    my ($stream_list) = shift;
+    my $best = $stream_list->[0];
+    my $last = pop(@{ $stream_list }); 
+
+    if (@{ $stream_list }) {
+
+        $stream_list->[0] = $last;
+        bitrate_heap_bubbledown($stream_list, 0);
+
+    }
+
+    return $best;
+}
+
+
 sub pick_stream {
 
     my ($stream_list, $debug) = @_;
-    my $count = 0;
-    my $selection = 0;
+    my $selection;
+    my @best_streams;
     my $category_filter = 'itag|bitrate|qualityLabel|quality|audioQuality|audioChannels|audioSampleRate|averageBitrate|height|width|fps';
 
 
-    foreach my $stream (@{ $stream_list }) {
+    for (my $i = 0; $i < 3; $i++) {
 
-        $count++;
-        print "\nStream $count:\n";
+        if (@{ $stream_list }) {
 
-        foreach my $key (keys %{ $stream }) {
-            
-            if (!$debug && $key !~ /$category_filter/) {
-                next;
+            $best_streams[$i] = bitrate_heap_behead($stream_list);
+            print "\nStream ", $i + 1,":\n";
+
+            foreach my $key (keys %{ $best_streams[$i] }) {
+                
+                if (!$debug && $key !~ /$category_filter/) {
+                    next;
+                }
+
+                print "$key: $best_streams[$i]->{$key}\n";
             }
 
-            print "$key: $stream->{$key}\n";
+            print "\n\n";
         }
-
-        print "\n\n";
     }
 
 
     do {
         
-        print "Your pick (1 - $count): ";
+        print "Your pick (1): ";
         chomp($selection = <STDIN>);
 
-    } while (!$selection || $selection < 1 || $selection > @{ $stream_list }); 
+        $selection = 1 if $selection eq '';
+
+    } while ($selection !~ /^\d+$/ || $selection < 1 || $selection > @best_streams); 
 
 
-    return $stream_list->[$selection - 1];
+    return $best_streams[$selection - 1];
 }
 
 
@@ -96,18 +160,18 @@ sub get_mp4streams {
     foreach my $stream (@{ $all_streams }) {
         
         if ($stream->{mimeType} =~ /(video|audio)\/mp4/) {
-            push(@{ $mp4_streams{$1} }, $stream);
+            bitrate_heap_add($mp4_streams{$1}, $stream);
         }
 
     }
     
 
-    print "\nChoose one of the available mp4 audio streams:\n\n";
+    print "\nChoose among the best mp4 audio streams:\n\n";
     push(@target_streams, pick_stream($mp4_streams{audio}, $debug));
 
     unless ($audio_only) {
 
-        print "\nChoose one of the available mp4 video streams:\n\n";
+        print "\nChoose among the best mp4 video streams:\n\n";
         push(@target_streams, pick_stream($mp4_streams{video}, $debug));
     }
 
@@ -172,7 +236,7 @@ sub video_metadigger {
     $op_data->{page_src} = qx($op_data->{curl} -sSL --compressed -A \Q$op_data->{agent}\E \Q$op_data->{url}\E)
     or die "Couldn't download the page source!\n";
 
-    ($op_data->{vid_title}) = $op_data->{page_src} =~ /"title":"(.+?)",/si 
+    ($op_data->{vid_title}) = $op_data->{page_src} =~ /videoDetails":\{.*?"title":"(.+?)",/si 
     or die "Couldn't locate the title JSON object\n";
 
     $op_data->{vid_title} =~ s/\\u0026/&/g;
