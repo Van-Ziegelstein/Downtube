@@ -52,7 +52,7 @@ sub bitrate_heap_add {
     while ($child != 0) {
 
         ($stream_list->[$parent], $stream_list->[$child]) = ($stream_list->[$child], $stream_list->[$parent])
-        if $stream_list->[$parent]->{bitrate} > $stream_list->[$child]->{bitrate};
+        if $stream_list->[$parent]->{bitrate} < $stream_list->[$child]->{bitrate};
 
         ($child, $parent) = ($parent, ($parent - 1) >> 1);
     }
@@ -68,9 +68,9 @@ sub bitrate_heap_bubbledown {
     my $best = $root;
 
 
-    $best = $leftC if $leftC < @{ $stream_list } && $stream_list->[$leftC]->{bitrate} < $stream_list->[$best]->{bitrate};
+    $best = $leftC if $leftC < @{ $stream_list } && $stream_list->[$leftC]->{bitrate} > $stream_list->[$best]->{bitrate};
 
-    $best = $rightC if $rightC < @{ $stream_list } && $stream_list->[$rightC]->{bitrate} < $stream_list->[$best]->{bitrate};
+    $best = $rightC if $rightC < @{ $stream_list } && $stream_list->[$rightC]->{bitrate} > $stream_list->[$best]->{bitrate};
 
     if ($best != $root) {
 
