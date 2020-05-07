@@ -188,7 +188,7 @@ sub signature_scramble {
     my $nodejs = find_prog("node");
 
 
-    $player_resources{player_url} = $op_data->{url_root} . $1 if $op_data->{page_src} =~ /src="\/(.+\/jsbin[^"]*\/base\.js)/;
+    $player_resources{player_url} = $op_data->{url_root} . $1 if $op_data->{page_src} =~ /src="\/(.+\/player_ias[^"]*\/base\.js)/;
     die "Couldn't extract the player url!\n" unless $player_resources{player_url};
 
     $player_resources{player_js} = qx($op_data->{curl} -sSL --compressed -A \Q$op_data->{agent}\E $player_resources{player_url}) 
