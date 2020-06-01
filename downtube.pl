@@ -252,12 +252,12 @@ sub video_metadigger {
         my ($type) = $stream->{mimeType} =~ /(audio|video)/;
         print "\nChecking source url of $type stream...\n";
 
-        if ($stream->{cipher}) {
+        if ($stream->{signatureCipher}) {
 
             print "\nStream uses signature scrambling for copyright protection.\n", 
             "Forging token...\n";
 
-            my $url_soup = url_decode($stream->{cipher});
+            my $url_soup = url_decode($stream->{signatureCipher});
             ($true_url) = $url_soup =~ /url=(.*)/;
             print "\nDEBUG ---> Decoded target url string:\n$url_soup\n\n" 
             if $op_data->{debug};
