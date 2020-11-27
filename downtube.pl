@@ -372,7 +372,7 @@ if ( @ARGV != 0) {
 
             url => undef,
             curl => find_prog("curl"),
-            agent => "Mozilla/5.0 (Windows NT 10.0; rv:68.0) Gecko/20100101 Firefox/68.0",
+            agent => "Mozilla/5.0 (Windows NT 10.0; rv:78.0) Gecko/20100101 Firefox/78.0",
             audio_only => 0,
             audio_target => undef,
             video_target => undef,
