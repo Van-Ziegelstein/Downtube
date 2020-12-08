@@ -142,19 +142,14 @@ sub pick_stream {
 
 sub get_mp4streams {
 
-    my ($format_list) = shift =~ /adaptiveFormats\\":(\[.*?\])/;
+    my ($format_list) = shift =~ /adaptiveFormats":(\[.*?\])/;
     my ($debug, $audio_only) = @_;
     my %mp4_streams = (video => [], audio => []);
     my @target_streams;
     
     die "Couldn't locate the adaptive streams.\n" unless $format_list;
 
-    # need to reduce the nesting of the backslash escapes
-    $format_list =~ s/\\([^\\]{1})/$1/g;
-    $format_list =~ s/\Q\\\E/\\/g;
-
     print "\nDEBUG ---> Parsed stream map:\n$format_list\n\n" if $debug;
-
     my $all_streams = decode_json($format_list);
 
     foreach my $stream (@{ $all_streams }) {
