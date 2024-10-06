@@ -1,6 +1,8 @@
 # Downtube
 Simple Youtube downloader
 
+**CURRENT STATUS (06.10.2024)**: This tool is now archived. The recent changes to the YouTube API would necessitate a thorough overhaul of the code, for which I currently don't have the time and resources. Hence, *DownTube*'s further development is postponed (for the time being). Perhaps it might still serve as a callback to simpler, pre-BIG-DATA-scraped times...
+
 [Description](#description)
 
 [Prerequisites](#prerequisites)
